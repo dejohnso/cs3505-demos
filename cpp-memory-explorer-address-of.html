@@ -1,0 +1,1266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C++ Stack & Heap Explorer</title>
+<style>
+  :root{
+    --bg:#f3f5f9;
+    --panel:#ffffff;
+    --ink:#182230;
+    --muted:#667085;
+    --border:#cfd5df;
+    --accent:#3349c6;
+    --stackHead:#dff1ff;
+    --heapHead:#fff0d4;
+    --varsHead:#dff5ef;
+    --changed:#fff3a8;
+    --freed:#f7d7da;
+    --empty:#fafbfc;
+    --ptr:#eee8ff;
+  }
+
+  *{box-sizing:border-box}
+
+  body{
+    margin:0;
+    padding:14px 18px 18px;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:Arial,Helvetica,sans-serif;
+  }
+
+  .page{
+    width:100%;
+    max-width:1600px;
+    margin:0 auto;
+  }
+
+  header{
+    display:flex;
+    align-items:flex-end;
+    justify-content:space-between;
+    gap:18px;
+    margin-bottom:10px;
+  }
+
+  h1{
+    margin:0;
+    font-size:30px;
+    line-height:1;
+  }
+
+  .subtitle{
+    margin-top:5px;
+    color:var(--muted);
+    font-size:14px;
+  }
+
+  code{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+
+  .controls{
+    display:flex;
+    gap:8px;
+    align-items:center;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  select,button{font:inherit}
+
+  select{
+    padding:8px 9px;
+    border:1px solid var(--border);
+    border-radius:8px;
+    background:white;
+  }
+
+  button{
+    padding:8px 13px;
+    border:0;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:700;
+    background:var(--accent);
+    color:white;
+  }
+
+  button.secondary{background:#475467}
+  button.light{background:#e7eaf1;color:#26324a}
+  button:disabled{opacity:.45;cursor:default}
+
+  .workspace{
+    display:grid;
+    grid-template-columns:minmax(390px,1.2fr) minmax(270px,.72fr) minmax(270px,.72fr);
+    gap:12px;
+    align-items:start;
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--border);
+    border-radius:11px;
+    overflow:hidden;
+    box-shadow:0 2px 7px rgba(16,24,40,.05);
+  }
+
+  .panel-title{
+    margin:0;
+    padding:9px 11px;
+    font-size:18px;
+    border-bottom:1px solid var(--border);
+  }
+
+  .stack .panel-title{background:var(--stackHead)}
+  .heap .panel-title{background:var(--heapHead)}
+  .variables .panel-title{background:var(--varsHead)}
+
+  .small-note{
+    color:#667085;
+    font-size:11px;
+    font-weight:normal;
+    margin-left:6px;
+  }
+
+  .code-wrap{padding:11px}
+
+  .status-row{
+    display:flex;
+    gap:6px;
+    flex-wrap:wrap;
+    margin-bottom:8px;
+  }
+
+  .pill{
+    display:inline-block;
+    padding:4px 8px;
+    border-radius:999px;
+    background:#eef1f5;
+    color:#475467;
+    font-size:12px;
+    font-weight:700;
+  }
+
+  .pill.error{
+    background:#ffe4e4;
+    color:#9c1c1c;
+  }
+
+  textarea{
+    width:100%;
+    height:300px;
+    resize:vertical;
+    border:1px solid var(--border);
+    border-radius:8px;
+    padding:11px;
+    background:#fcfcfd;
+    color:#172033;
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+    font-size:17px;
+    line-height:1.48;
+    tab-size:2;
+  }
+
+  .step-box{
+    margin-top:9px;
+    min-height:82px;
+    border-left:5px solid var(--accent);
+    border-radius:6px;
+    background:#f1f3ff;
+    padding:9px 10px;
+    font-size:14px;
+    line-height:1.35;
+  }
+
+  .step-box code{font-size:14px}
+  .explanation{margin-top:5px}
+
+  .assumptions{
+    margin-top:8px;
+    color:#667085;
+    font-size:11px;
+    line-height:1.35;
+  }
+
+  .variables{margin-top:10px}
+
+  table{
+    width:100%;
+    border-collapse:collapse;
+    table-layout:fixed;
+  }
+
+  th,td{
+    border-bottom:1px solid #e8ebef;
+    padding:6px 9px;
+    font-size:14px;
+    height:33px;
+  }
+
+  th{
+    background:#fbfcfd;
+    text-align:left;
+    color:#475467;
+    font-size:11px;
+    text-transform:uppercase;
+    letter-spacing:.035em;
+  }
+
+  tr:last-child td{border-bottom:0}
+
+  .addr,.value{
+    font-family:"SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  }
+
+  .addr{width:44%}
+
+  .memory-body{
+    min-height:430px;
+  }
+
+  .memory-body th,
+  .memory-body td{
+    font-size:15px;
+    height:34px;
+  }
+
+  .memory-body th{
+    font-size:11px;
+  }
+
+  .empty td{
+    background:var(--empty);
+    color:#a0a7b2;
+  }
+
+  .changed td{
+    background:var(--changed) !important;
+  }
+
+  .freed td{
+    background:var(--freed);
+    color:#8b2520;
+  }
+
+  .pointer-value{
+    background:var(--ptr);
+    font-weight:700;
+  }
+
+  .next-stack td{
+    box-shadow:inset 4px 0 0 var(--accent);
+  }
+
+  .next-stack .value::after{
+    content:" next";
+    color:var(--accent);
+    font-family:Arial,Helvetica,sans-serif;
+    font-size:10px;
+    font-weight:700;
+    text-transform:uppercase;
+  }
+
+  .legend{
+    display:flex;
+    gap:11px;
+    flex-wrap:wrap;
+    padding:7px 9px 9px;
+    border-top:1px solid var(--border);
+    color:#667085;
+    font-size:10px;
+  }
+
+  .swatch{
+    display:inline-block;
+    width:10px;
+    height:10px;
+    border:1px solid #aaa;
+    margin-right:3px;
+    vertical-align:-1px;
+  }
+
+  .danger{
+    color:#b42318;
+    font-weight:700;
+  }
+
+  .empty-vars{
+    padding:13px;
+    color:#98a2b3;
+    font-size:13px;
+  }
+
+  @media(max-width:1050px){
+    .workspace{grid-template-columns:1fr 1fr}
+    .left{grid-column:1 / -1}
+    textarea{height:240px}
+  }
+
+  @media(max-width:720px){
+    body{padding:10px}
+    header{align-items:flex-start;flex-direction:column}
+    .controls{justify-content:flex-start}
+    .workspace{grid-template-columns:1fr}
+    .left{grid-column:auto}
+  }
+
+  @media(min-width:1300px){
+    textarea{height:330px;font-size:18px}
+    .memory-body th,.memory-body td{font-size:16px;height:36px}
+    .memory-body th{font-size:12px}
+  }
+</style>
+</head>
+
+<body>
+<div class="page">
+
+<header>
+  <div>
+    <h1>C++ Stack &amp; Heap Explorer</h1>
+    <div class="subtitle">32-bit teaching model: <code>int</code> = 4 bytes, <code>int*</code> = 4 bytes</div>
+  </div>
+
+  <div class="controls">
+    <label>
+      Example:
+      <select id="preset"></select>
+    </label>
+    <button id="stepBtn">Step</button>
+    <button id="runBtn" class="secondary">Run All</button>
+    <button id="resetBtn" class="light">Reset</button>
+  </div>
+</header>
+
+<div class="workspace">
+
+  <div class="left">
+    <section class="panel">
+      <h2 class="panel-title">Tiny C++ Program <span class="small-note">edit, then step through</span></h2>
+
+      <div class="code-wrap">
+        <div class="status-row">
+          <span class="pill" id="pcPill">Next line: 1</span>
+          <span class="pill" id="statusPill">Ready</span>
+        </div>
+
+        <textarea id="code" spellcheck="false"></textarea>
+
+        <div class="step-box">
+          <div><strong>Executed:</strong> <code id="currentLine">—</code></div>
+          <div id="explanation" class="explanation">Press <strong>Step</strong> to execute the first line.</div>
+        </div>
+
+        <div class="assumptions">
+          Fake addresses are intentionally simple. Stack begins at <code>0x1000</code>;
+          heap begins at <code>0x4000</code>. Raw integers are displayed in decimal.
+          Values that are addresses are displayed in hexadecimal. The address-of operator <code>&amp;</code> is supported,
+          but C++ reference types and pointer-to-pointer types are intentionally not modeled. The heap uses a simple first-fit allocator.
+        </div>
+      </div>
+    </section>
+
+    <section class="panel variables">
+      <h2 class="panel-title">Variables</h2>
+      <div id="varsTable"></div>
+    </section>
+  </div>
+
+  <section class="panel stack">
+    <h2 class="panel-title">Stack</h2>
+    <div id="stackTable" class="memory-body"></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--ptr)"></span>address value</span>
+      <span><span class="swatch" style="background:var(--changed)"></span>changed this step</span>
+    </div>
+  </section>
+
+  <section class="panel heap">
+    <h2 class="panel-title">Heap</h2>
+    <div id="heapTable" class="memory-body"></div>
+    <div class="legend">
+      <span><span class="swatch" style="background:var(--changed)"></span>changed this step</span>
+      <span><span class="swatch" style="background:var(--freed)"></span>free hole</span>
+    </div>
+  </section>
+
+</div>
+</div>
+
+<script>
+const STACK_START = 0x1000;
+const HEAP_START  = 0x4000;
+const STACK_SLOTS = 10;
+const HEAP_SLOTS  = 14;
+
+const presets = {
+  "new / delete": `int* p = new int(4);
+delete p;`,
+
+  "Pointer to stack variable": `int x = 10;
+int* p = &x;
+*p = 25;
+x = 7;`,
+
+  "Address-of operator": `int x = 10;
+int y = 20;
+int a[3] = {30, 40, 50};
+int* p = &x;
+p = &y;
+*p = 99;
+p = &a[1];
+*p = 77;
+int z = *(&x);`,
+
+  "Stack array": `int a[3] = {10, 20, 30};
+int* p = a;
+p[1] = 99;
+int x = a[1];`,
+
+  "Heap array": `int* p = new int[3];
+p[0] = 10;
+p[1] = 20;
+p[2] = 30;
+int x = p[1];
+delete[] p;`,
+
+  "Two pointers, one object": `int* p = new int(4);
+int* q = p;
+*q = 17;
+delete p;`,
+
+  "Dangling pointer error": `int* p = new int(4);
+int* q = p;
+delete p;
+*q = 99;`,
+
+  "Heap fragmentation": `int* a = new int[2];
+int* b = new int[3];
+int* c = new int[2];
+delete[] b;
+int* d = new int[2];
+int* e = new int[2];`
+};
+
+const $ = id => document.getElementById(id);
+
+const presetEl = $("preset");
+const codeEl = $("code");
+const stepBtn = $("stepBtn");
+const runBtn = $("runBtn");
+const resetBtn = $("resetBtn");
+const currentLineEl = $("currentLine");
+const explanationEl = $("explanation");
+const stackTableEl = $("stackTable");
+const heapTableEl = $("heapTable");
+const varsTableEl = $("varsTable");
+const pcPill = $("pcPill");
+const statusPill = $("statusPill");
+
+Object.keys(presets).forEach(name => {
+  const option = document.createElement("option");
+  option.value = name;
+  option.textContent = name;
+  presetEl.appendChild(option);
+});
+
+let state;
+let lines = [];
+let pc = 0;
+
+function hex(n){
+  return "0x" + n.toString(16).toUpperCase().padStart(4,"0");
+}
+
+function blankState(){
+  return {
+    vars:new Map(),
+    stack:new Map(),
+    heap:new Map(),
+    blocks:new Map(),
+    nextBlockId:1,
+    nextStack:STACK_START,
+    touchedStack:new Set(),
+    touchedHeap:new Set(),
+    error:null
+  };
+}
+
+function cleanLines(){
+  return codeEl.value
+    .split("\n")
+    .map((raw,i) => ({
+      text:raw.replace(/\/\/.*$/,"").trim(),
+      lineNo:i+1
+    }))
+    .filter(x => x.text.length);
+}
+
+function reset(){
+  state = blankState();
+  lines = cleanLines();
+  pc = 0;
+  currentLineEl.textContent = "—";
+  explanationEl.innerHTML = 'Press <strong>Step</strong> to execute the first line.';
+  render();
+}
+
+function variable(name){
+  if(!state.vars.has(name)){
+    throw new Error(`Unknown variable "${name}".`);
+  }
+  return state.vars.get(name);
+}
+
+function allocStack(label,type,value){
+  if(state.nextStack >= STACK_START + STACK_SLOTS*4){
+    throw new Error("The small teaching stack is full.");
+  }
+
+  const addr = state.nextStack;
+  state.nextStack += 4;
+
+  state.stack.set(addr,{label,type,value});
+  state.touchedStack.add(addr);
+
+  return addr;
+}
+
+function heapAddress(index){
+  return HEAP_START + index*4;
+}
+
+function heapSlotAvailable(index){
+  const cell = state.heap.get(heapAddress(index));
+  return !cell || cell.freed;
+}
+
+function findFirstFit(count){
+  for(let start=0; start<=HEAP_SLOTS-count; start++){
+    let fits = true;
+
+    for(let i=0;i<count;i++){
+      if(!heapSlotAvailable(start+i)){
+        fits = false;
+        break;
+      }
+    }
+
+    if(fits) return start;
+  }
+
+  return -1;
+}
+
+function allocHeap(count){
+  const startIndex = findFirstFit(count);
+
+  if(startIndex < 0){
+    throw new Error(`No contiguous run of ${count} free heap slots is available.`);
+  }
+
+  const id = state.nextBlockId++;
+  const base = heapAddress(startIndex);
+
+  state.blocks.set(id,{
+    id,
+    base,
+    count,
+    freed:false
+  });
+
+  for(let i=0;i<count;i++){
+    const addr = base + i*4;
+
+    state.heap.set(addr,{
+      blockId:id,
+      index:i,
+      value:"?",
+      freed:false
+    });
+
+    state.touchedHeap.add(addr);
+  }
+
+  return base;
+}
+
+function addressIsFreed(addr){
+  const cell = state.heap.get(addr);
+  return !!cell && cell.freed;
+}
+
+function pointerTarget(name){
+  const v = variable(name);
+
+  if(v.kind !== "ptr"){
+    throw new Error(`${name} is not a pointer.`);
+  }
+
+  return state.stack.get(v.addr).value;
+}
+
+function readMemory(addr){
+  if(addr === null){
+    throw new Error("Attempted to dereference nullptr.");
+  }
+
+  if(addr === "UNINIT"){
+    throw new Error("Attempted to dereference an uninitialized pointer.");
+  }
+
+  if(state.stack.has(addr)){
+    return state.stack.get(addr).value;
+  }
+
+  if(state.heap.has(addr)){
+    const cell = state.heap.get(addr);
+
+    if(cell.freed){
+      throw new Error(`Use-after-free at ${hex(addr)}.`);
+    }
+
+    return cell.value;
+  }
+
+  throw new Error(`Address ${hex(addr)} is not valid in this simulator.`);
+}
+
+function writeMemory(addr,value){
+  if(addr === null){
+    throw new Error("Attempted to dereference nullptr.");
+  }
+
+  if(addr === "UNINIT"){
+    throw new Error("Attempted to dereference an uninitialized pointer.");
+  }
+
+  if(state.stack.has(addr)){
+    state.stack.get(addr).value = value;
+    state.touchedStack.add(addr);
+    return;
+  }
+
+  if(state.heap.has(addr)){
+    const cell = state.heap.get(addr);
+
+    if(cell.freed){
+      throw new Error(`Use-after-free at ${hex(addr)}.`);
+    }
+
+    cell.value = value;
+    state.touchedHeap.add(addr);
+    return;
+  }
+
+  throw new Error(`Address ${hex(addr)} is not valid in this simulator.`);
+}
+
+function evalInt(expr){
+  expr = expr.trim();
+
+  if(/^-?\d+$/.test(expr)){
+    return Number(expr);
+  }
+
+  // Dereference a parenthesized pointer expression, e.g. *(&x)
+  let m = expr.match(/^\*\s*\((.+)\)$/);
+
+  if(m){
+    return readMemory(evalPointer(m[1]));
+  }
+
+  // Simple dereference, e.g. *p
+  m = expr.match(/^\*\s*(\w+)$/);
+
+  if(m){
+    return readMemory(pointerTarget(m[1]));
+  }
+
+  m = expr.match(/^(\w+)\[(\d+)\]$/);
+
+  if(m){
+    const name = m[1];
+    const index = Number(m[2]);
+    const v = variable(name);
+    let addr;
+
+    if(v.kind === "array"){
+      if(index >= v.count){
+        throw new Error(`Index ${index} is outside ${name}[${v.count}].`);
+      }
+
+      addr = v.addr + index*4;
+    }
+    else if(v.kind === "ptr"){
+      const base = pointerTarget(name);
+
+      if(typeof base !== "number"){
+        throw new Error(`${name} does not contain a usable address.`);
+      }
+
+      addr = base + index*4;
+    }
+    else{
+      throw new Error(`${name} is not an array or pointer.`);
+    }
+
+    return readMemory(addr);
+  }
+
+  if(/^\w+$/.test(expr)){
+    const v = variable(expr);
+
+    if(v.kind !== "int"){
+      throw new Error(`${expr} is not an int.`);
+    }
+
+    return state.stack.get(v.addr).value;
+  }
+
+  throw new Error(`Unsupported integer expression: ${expr}`);
+}
+function evalPointer(expr){
+  expr = expr.trim();
+
+  if(expr === "nullptr"){
+    return null;
+  }
+
+  // Address of an array element: &a[2]
+  let m = expr.match(/^&\s*(\w+)\s*\[\s*(\d+)\s*\]$/);
+
+  if(m){
+    const name = m[1];
+    const index = Number(m[2]);
+    const v = variable(name);
+
+    if(v.kind !== "array"){
+      throw new Error(`&${name}[${index}] requires ${name} to be a stack array in this simulator.`);
+    }
+
+    if(index >= v.count){
+      throw new Error(`Index ${index} is outside ${name}[${v.count}].`);
+    }
+
+    return v.addr + index*4;
+  }
+
+  // Address of an ordinary int variable: &x
+  m = expr.match(/^&\s*(\w+)$/);
+
+  if(m){
+    const name = m[1];
+    const v = variable(name);
+
+    if(v.kind === "ptr"){
+      throw new Error(`&${name} has type int**. This simulator intentionally models only int and int*.`);
+    }
+
+    if(v.kind === "array"){
+      throw new Error(`&${name} is a pointer-to-array in real C++. Use ${name} or &${name}[0] for an int* here.`);
+    }
+
+    return v.addr;
+  }
+
+  // Existing pointer value, or simplified array-to-pointer decay.
+  if(/^\w+$/.test(expr)){
+    const v = variable(expr);
+
+    if(v.kind === "ptr"){
+      return state.stack.get(v.addr).value;
+    }
+
+    if(v.kind === "array"){
+      return v.addr;
+    }
+  }
+
+  throw new Error(`Unsupported pointer expression: ${expr}`);
+}
+function deleteBlockByPointer(name,wantsArray){
+  const addr = pointerTarget(name);
+
+  if(addr === null){
+    return wantsArray ? "delete[] nullptr does nothing." : "delete nullptr does nothing.";
+  }
+
+  const cell = state.heap.get(addr);
+
+  if(!cell || cell.freed){
+    throw new Error(`${name} does not point to the start of a live heap allocation.`);
+  }
+
+  const block = state.blocks.get(cell.blockId);
+
+  if(!block || block.freed || block.base !== addr){
+    throw new Error(`${name} does not point to the start of a live heap allocation.`);
+  }
+
+  if(wantsArray && block.count === 1){
+    throw new Error("This allocation contains one int. Use delete in this simulator.");
+  }
+
+  if(!wantsArray && block.count !== 1){
+    throw new Error(`This allocation contains ${block.count} ints. Use delete[] in this simulator.`);
+  }
+
+  block.freed = true;
+
+  for(let i=0;i<block.count;i++){
+    const a = block.base + i*4;
+    const c = state.heap.get(a);
+
+    if(c && c.blockId === block.id){
+      c.freed = true;
+      state.touchedHeap.add(a);
+    }
+  }
+
+  return `${wantsArray ? "delete[]" : "delete"} released the heap allocation beginning at ${hex(block.base)}. The pointer variable itself is still on the stack and still contains that address.`;
+}
+
+function execute(line){
+  state.touchedStack.clear();
+  state.touchedHeap.clear();
+  state.error = null;
+
+  let m;
+
+  // int a[3] = {10,20,30};
+  m = line.match(/^int\s+(\w+)\s*\[(\d+)\]\s*(?:=\s*\{([^}]*)\})?\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const count = Number(m[2]);
+
+    if(state.vars.has(name)){
+      throw new Error(`${name} is already declared.`);
+    }
+
+    const vals = m[3]
+      ? m[3].split(",").map(s=>s.trim()).filter(Boolean)
+      : [];
+
+    const base = state.nextStack;
+
+    for(let i=0;i<count;i++){
+      const value = i < vals.length ? Number(vals[i]) : 0;
+
+      if(Number.isNaN(value)){
+        throw new Error("Array initializers must be integer literals here.");
+      }
+
+      allocStack(`${name}[${i}]`,"int",value);
+    }
+
+    state.vars.set(name,{
+      name,
+      kind:"array",
+      addr:base,
+      count,
+      type:`int[${count}]`
+    });
+
+    return `Declared ${name}[${count}] on the stack. Its first int is at ${hex(base)} and each additional int is 4 bytes later.`;
+  }
+
+  // int* p = new int[3];
+  m = line.match(/^int\s*\*\s*(\w+)\s*=\s*new\s+int\s*\[(\d+)\]\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const count = Number(m[2]);
+
+    if(state.vars.has(name)){
+      throw new Error(`${name} is already declared.`);
+    }
+
+    const pAddr = allocStack(name,"int*","UNINIT");
+    const heapAddr = allocHeap(count);
+
+    state.stack.get(pAddr).value = heapAddr;
+
+    state.vars.set(name,{
+      name,
+      kind:"ptr",
+      addr:pAddr,
+      type:"int*"
+    });
+
+    return `${name} is a pointer variable at ${hex(pAddr)}. new int[${count}] allocated heap memory beginning at ${hex(heapAddr)}, so that address is stored in ${name}.`;
+  }
+
+  // int* p = new int(4);
+  m = line.match(/^int\s*\*\s*(\w+)\s*=\s*new\s+int\s*\(\s*(-?\d+)\s*\)\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const value = Number(m[2]);
+
+    if(state.vars.has(name)){
+      throw new Error(`${name} is already declared.`);
+    }
+
+    const pAddr = allocStack(name,"int*","UNINIT");
+    const heapAddr = allocHeap(1);
+
+    state.heap.get(heapAddr).value = value;
+    state.stack.get(pAddr).value = heapAddr;
+
+    state.vars.set(name,{
+      name,
+      kind:"ptr",
+      addr:pAddr,
+      type:"int*"
+    });
+
+    return `${name} is stored at stack address ${hex(pAddr)}. Its value is the heap address ${hex(heapAddr)}. The integer ${value} is stored at that heap address.`;
+  }
+
+  // int* p = expression;
+  m = line.match(/^int\s*\*\s*(\w+)\s*(?:=\s*(.+?))?\s*;$/);
+
+  if(m){
+    const name = m[1];
+
+    if(state.vars.has(name)){
+      throw new Error(`${name} is already declared.`);
+    }
+
+    const value = m[2] ? evalPointer(m[2]) : "UNINIT";
+    const addr = allocStack(name,"int*",value);
+
+    state.vars.set(name,{
+      name,
+      kind:"ptr",
+      addr,
+      type:"int*"
+    });
+
+    return `Declared pointer ${name} at ${hex(addr)}. Its value is ${value===null ? "nullptr" : value==="UNINIT" ? "uninitialized" : hex(value)}.`;
+  }
+
+  // int x = expression;
+  m = line.match(/^int\s+(\w+)\s*(?:=\s*(.+?))?\s*;$/);
+
+  if(m){
+    const name = m[1];
+
+    if(state.vars.has(name)){
+      throw new Error(`${name} is already declared.`);
+    }
+
+    const value = m[2] ? evalInt(m[2]) : "?";
+    const addr = allocStack(name,"int",value);
+
+    state.vars.set(name,{
+      name,
+      kind:"int",
+      addr,
+      type:"int"
+    });
+
+    return `Declared int ${name} at ${hex(addr)}${m[2] ? ` and stored ${value}` : ""}.`;
+  }
+
+  m = line.match(/^delete\s*\[\s*\]\s*(\w+)\s*;$/);
+
+  if(m){
+    return deleteBlockByPointer(m[1],true);
+  }
+
+  m = line.match(/^delete\s+(\w+)\s*;$/);
+
+  if(m){
+    return deleteBlockByPointer(m[1],false);
+  }
+
+  // *(pointer-expression) = expression; e.g. *(&x) = 12;
+  m = line.match(/^\*\s*\((.+)\)\s*=\s*(.+?)\s*;$/);
+
+  if(m){
+    const addr = evalPointer(m[1]);
+    const value = evalInt(m[2]);
+
+    writeMemory(addr,value);
+
+    return `The pointer expression evaluates to ${hex(addr)}, so ${value} is written to that address.`;
+  }
+
+  // *p = expression;
+  m = line.match(/^\*\s*(\w+)\s*=\s*(.+?)\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const value = evalInt(m[2]);
+    const addr = pointerTarget(name);
+
+    writeMemory(addr,value);
+
+    return `*${name} means the int at the address stored in ${name}. Since ${name} contains ${hex(addr)}, ${value} is written to ${hex(addr)}.`;
+  }
+
+  // a[1] = expression or p[1] = expression
+  m = line.match(/^(\w+)\[(\d+)\]\s*=\s*(.+?)\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const index = Number(m[2]);
+    const value = evalInt(m[3]);
+    const v = variable(name);
+    let addr;
+
+    if(v.kind === "array"){
+      if(index >= v.count){
+        throw new Error(`Index ${index} is outside ${name}[${v.count}].`);
+      }
+
+      addr = v.addr + index*4;
+    }
+    else if(v.kind === "ptr"){
+      const base = pointerTarget(name);
+
+      if(typeof base !== "number"){
+        throw new Error(`${name} does not contain a usable address.`);
+      }
+
+      addr = base + index*4;
+    }
+    else{
+      throw new Error(`${name} is not an array or pointer.`);
+    }
+
+    writeMemory(addr,value);
+
+    return `${name}[${index}] is ${index} ints past the base address, so ${value} is written to ${hex(addr)}.`;
+  }
+
+  // x = ... or p = ...
+  m = line.match(/^(\w+)\s*=\s*(.+?)\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const v = variable(name);
+
+    if(v.kind === "ptr"){
+      const value = evalPointer(m[2]);
+
+      state.stack.get(v.addr).value = value;
+      state.touchedStack.add(v.addr);
+
+      return `Changed the address stored in pointer ${name} to ${value===null ? "nullptr" : hex(value)}.`;
+    }
+
+    if(v.kind === "int"){
+      const value = evalInt(m[2]);
+
+      state.stack.get(v.addr).value = value;
+      state.touchedStack.add(v.addr);
+
+      return `Stored ${value} in ${name} at ${hex(v.addr)}.`;
+    }
+  }
+
+  throw new Error(`Unsupported statement: ${line}`);
+}
+
+function step(){
+  if(pc >= lines.length){
+    return;
+  }
+
+  const entry = lines[pc];
+  currentLineEl.textContent = `${entry.lineNo}: ${entry.text}`;
+
+  try{
+    explanationEl.textContent = execute(entry.text);
+  }
+  catch(err){
+    state.error = err.message;
+    explanationEl.innerHTML = `<span class="danger">Error:</span> ${err.message}`;
+  }
+
+  pc++;
+  render();
+}
+
+function runAll(){
+  let guard = 0;
+
+  while(pc < lines.length && guard++ < 100){
+    step();
+
+    if(state.error){
+      break;
+    }
+  }
+}
+
+function formatMemoryValue(cell){
+  if(!cell){
+    return "—";
+  }
+
+  if(cell.type === "int*"){
+    if(cell.value === null){
+      return "0x0000";
+    }
+
+    if(cell.value === "UNINIT"){
+      return "?";
+    }
+
+    return hex(cell.value);
+  }
+
+  return String(cell.value);
+}
+
+function renderStack(){
+  const rows = [];
+
+  for(let i=0;i<STACK_SLOTS;i++){
+    const addr = STACK_START + i*4;
+    const cell = state.stack.get(addr);
+    const touched = state.touchedStack.has(addr);
+    const isNext = !cell && addr === state.nextStack;
+    const isPointer = cell && cell.type === "int*";
+
+    rows.push(`
+      <tr class="${!cell ? "empty " : ""}${touched ? "changed " : ""}${isNext ? "next-stack " : ""}">
+        <td class="addr">${hex(addr)}</td>
+        <td class="value ${isPointer ? "pointer-value" : ""}">${formatMemoryValue(cell)}</td>
+      </tr>
+    `);
+  }
+
+  stackTableEl.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join("")}</tbody>
+    </table>
+  `;
+}
+
+function renderHeap(){
+  const rows = [];
+
+  for(let i=0;i<HEAP_SLOTS;i++){
+    const addr = HEAP_START + i*4;
+    const cell = state.heap.get(addr);
+    const touched = state.touchedHeap.has(addr);
+    const freed = cell && cell.freed;
+
+    let value = "—";
+
+    if(cell){
+      value = freed ? "FREE" : String(cell.value);
+    }
+
+    rows.push(`
+      <tr class="${!cell ? "empty " : ""}${touched ? "changed " : ""}${freed ? "freed " : ""}">
+        <td class="addr">${hex(addr)}</td>
+        <td class="value">${value}</td>
+      </tr>
+    `);
+  }
+
+  heapTableEl.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Address</th>
+          <th>Value</th>
+        </tr>
+      </thead>
+      <tbody>${rows.join("")}</tbody>
+    </table>
+  `;
+}
+
+function renderVars(){
+  if(state.vars.size === 0){
+    varsTableEl.innerHTML = `<div class="empty-vars">No variables declared yet.</div>`;
+    return;
+  }
+
+  const rows = [...state.vars.values()].map(v => `
+    <tr>
+      <td><strong>${v.name}</strong></td>
+      <td>${v.type}</td>
+      <td class="addr">${hex(v.addr)}</td>
+    </tr>
+  `).join("");
+
+  varsTableEl.innerHTML = `
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Type</th>
+          <th>Address</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>
+  `;
+}
+
+function render(){
+  renderStack();
+  renderHeap();
+  renderVars();
+
+  pcPill.textContent = pc < lines.length
+    ? `Next line: ${lines[pc].lineNo}`
+    : "Program complete";
+
+  statusPill.textContent = state.error
+    ? "Last step had an error"
+    : pc >= lines.length
+      ? "Complete"
+      : "Ready";
+
+  statusPill.className = "pill" + (state.error ? " error" : "");
+
+  stepBtn.disabled = pc >= lines.length;
+  runBtn.disabled = pc >= lines.length;
+}
+
+presetEl.addEventListener("change",() => {
+  codeEl.value = presets[presetEl.value];
+  reset();
+});
+
+stepBtn.addEventListener("click",step);
+runBtn.addEventListener("click",runAll);
+resetBtn.addEventListener("click",reset);
+
+codeEl.addEventListener("input",() => {
+  state = blankState();
+  lines = cleanLines();
+  pc = 0;
+
+  currentLineEl.textContent = "—";
+  explanationEl.textContent = "Program edited. Press Step to execute from the beginning.";
+
+  render();
+});
+
+presetEl.value = "new / delete";
+codeEl.value = presets[presetEl.value];
+reset();
+</script>
+
+</body>
+</html>
