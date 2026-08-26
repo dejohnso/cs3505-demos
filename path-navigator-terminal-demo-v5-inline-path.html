@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Path Navigator</title>
+<style>
+:root{--bg:#f3f5f8;--p:#fff;--ink:#1d2939;--mut:#667085;--bd:#d0d5dd;--a:#3157c8;--good:#def4e6;--bad:#ffe3e3;--term:#17212d;--term2:#243141;--c1:#d94f70;--c2:#d28620;--c3:#3a8c5f;--c4:#337bb5;--c5:#7256bd;--c6:#b14e9a}
+*{box-sizing:border-box}body{margin:0;padding:14px 18px 20px;background:var(--bg);color:var(--ink);font-family:Arial,sans-serif}.page{max-width:1550px;margin:auto}
+header{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;margin-bottom:11px}h1{margin:0;font-size:29px}.sub{margin-top:5px;color:var(--mut);font-size:13px}button,select,input{font:inherit}button{border:0;border-radius:8px;padding:8px 12px;background:var(--a);color:white;font-weight:700;cursor:pointer}button.light{background:#e8ecf2;color:#344054}button:disabled{opacity:.4;cursor:default}select{padding:7px 9px;border:1px solid var(--bd);border-radius:8px;background:white}.controls{display:flex;gap:7px;align-items:center;flex-wrap:wrap}
+.layout{display:grid;grid-template-columns:minmax(520px,1.12fr) minmax(430px,.88fr);gap:12px;align-items:start}.panel{background:var(--p);border:1px solid var(--bd);border-radius:11px;overflow:hidden;box-shadow:0 2px 7px #1018280d}.title{margin:0;padding:9px 11px;border-bottom:1px solid var(--bd);font-size:17px}.mission .title{background:#eef3ff}.treepanel .title{background:#eef8f3}.resolve .title{background:#fff6e6}.body{padding:10px}.small{font-size:11px;color:var(--mut);font-weight:normal}
+.success{display:none;margin-bottom:10px;padding:9px 11px;border-radius:8px;background:var(--good);color:#21633a;font-weight:800}.success.show{display:flex;justify-content:space-between;align-items:center}
+.card{border-left:5px solid var(--a);background:#f4f7ff;border-radius:8px;padding:10px 11px;margin-bottom:9px}.cardtop{display:flex;justify-content:space-between;gap:10px;align-items:center}.mname{font-size:17px;font-weight:800}.progress{padding:4px 8px;border-radius:999px;background:#e2e9ff;color:#2f4ca9;font-size:11px;font-weight:800}.mdesc{margin-top:6px;font-size:13px;line-height:1.45}.checks{margin-top:8px;display:flex;flex-direction:column;gap:5px}.check{display:flex;gap:7px;font-size:12px;color:#475467}.box{width:17px;height:17px;border:2px solid #aeb8c7;border-radius:4px;display:grid;place-items:center;flex:0 0 auto;font-size:11px}.check.done{color:#21633a}.check.done .box{background:#48a36a;border-color:#48a36a;color:white}.cwdbar{display:flex;gap:8px;align-items:center;padding:7px 9px;margin:8px 0;border:1px solid #ccd5e1;border-radius:8px;background:#fbfcfd}.cwdlabel{font-size:10px;text-transform:uppercase;color:#667085;font-weight:800}.cwd{font:700 13px Consolas,monospace;color:#253f91;overflow-wrap:anywhere}
+.terminal{background:var(--term);border:1px solid #273544;border-radius:9px;overflow:hidden}.termhead{padding:6px 9px;background:var(--term2);color:#cbd5df;font-size:10px;font-weight:800;text-transform:uppercase;display:flex;justify-content:space-between}.history{height:230px;overflow:auto;margin:0;padding:9px 10px;color:#edf2f7;font:13px/1.48 Consolas,monospace;white-space:pre-wrap}.promptrow{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;gap:7px;align-items:center;padding:8px 9px;border-top:1px solid #334151;background:#101923}.prompt{font:13px Consolas,monospace;color:#9fd2ff}#cmd{width:100%;border:0;outline:0;border-radius:5px;background:#202d3b;color:white;padding:7px 8px;font:13px Consolas,monospace}.termnote{margin-top:7px;color:#667085;font-size:11px;line-height:1.4}
+.pendingcmd{display:none;width:100%;min-height:34px;align-items:center;flex-wrap:wrap;border-radius:5px;background:#202d3b;color:white;padding:7px 8px;font:13px Consolas,monospace;overflow-wrap:anywhere}
+.pendingcmd.show{display:flex}
+.cmdplain{color:#f4f7fb}.cmdslash{color:#aeb9c6}
+.cmdseg{color:white;padding:1px 3px;border-radius:4px;margin:0 1px;opacity:.34}
+.cmdseg.done{opacity:1}.cmdseg.active{opacity:1;outline:3px solid #ffffff45}.cmdseg.error{background:#b42318!important}
+#stepPath{display:none;min-width:135px;background:#7750b8;white-space:nowrap}
+#stepPath.show{display:inline-block}
+.inlineeffect{margin-top:9px;padding:8px 10px;border-left:5px solid #7750b8;border-radius:7px;background:#f8f5ff;font-size:12px;line-height:1.4;min-height:47px}
+.ref{margin-top:9px;padding-top:8px;border-top:1px solid var(--bd)}.ref b{font-size:11px;color:#475467}.chips{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.chip{padding:4px 7px;border-radius:999px;background:#edf0f4;color:#344054;font:11px Consolas,monospace}
+.treehelp{padding:7px 8px;margin-bottom:8px;border-radius:7px;background:#f7f8fa;color:#667085;font-size:11px;line-height:1.35}.tree{min-height:515px;font:13px/1.3 Consolas,monospace}.tree ul{list-style:none;margin:0;padding-left:21px;border-left:1px solid #dbe1e8}.tree>ul{padding-left:0;border-left:0}.tree li{margin:2px 0}.entry{display:inline-flex;align-items:center;gap:6px;padding:4px 7px;border:2px solid transparent;border-radius:7px;transition:.15s}.entry.dir{background:#edf5ff}.entry.exe{background:#edf8ef}.entry.current{border-color:var(--a);box-shadow:0 0 0 3px #3157c81c;font-weight:800}.entry.trace{transform:scale(1.04);box-shadow:0 0 0 4px #00000012}.entry.target{border-style:dashed;border-color:#7750b8}.icon{width:17px;text-align:center}.meta{font:9px Arial;color:#667085;margin-left:4px}
+.effect{margin-top:11px;padding:8px 9px;border-radius:8px;background:#f7f8fa;border:1px solid #e1e5ea}.effecttitle{font-size:10px;text-transform:uppercase;color:#667085;font-weight:800;margin-bottom:4px}.effecttext{font-size:12px;line-height:1.4}
+.c1{background:var(--c1)}.c2{background:var(--c2)}.c3{background:var(--c3)}.c4{background:var(--c4)}.c5{background:var(--c5)}.c6{background:var(--c6)}.tc1{border-color:var(--c1)!important;background:#fff4f7!important}.tc2{border-color:var(--c2)!important;background:#fff9ef!important}.tc3{border-color:var(--c3)!important;background:#f1faf5!important}.tc4{border-color:var(--c4)!important;background:#f1f7fb!important}.tc5{border-color:var(--c5)!important;background:#f6f3fb!important}.tc6{border-color:var(--c6)!important;background:#fbf3f9!important}
+@media(max-width:1000px){.layout{grid-template-columns:1fr}.tree{min-height:400px}}@media(max-width:720px){body{padding:10px}header{flex-direction:column;align-items:flex-start}.layout{grid-template-columns:1fr}.mission{grid-column:auto}}
+</style>
+</head>
+<body>
+<div class="page">
+<header><div><h1>Path Navigator</h1><div class="sub">A visual terminal for learning relative paths, absolute paths, <code>.</code>, and <code>..</code>.</div></div><div class="controls"><label>Mission: <select id="missionSelect"></select></label><button id="reset" class="light">Reset Mission</button></div></header>
+<div id="success" class="success"><span id="successText"></span><button id="next">Next Mission</button></div>
+<div class="layout">
+<section class="panel mission"><h2 class="title">Mission &amp; Terminal <span class="small">writing the command is the prediction</span></h2><div class="body">
+<div class="card"><div class="cardtop"><div id="mname" class="mname"></div><div id="progress" class="progress"></div></div><div id="mdesc" class="mdesc"></div><div id="checks" class="checks"></div></div>
+<div class="cwdbar"><span class="cwdlabel">Current working directory</span><span id="cwd" class="cwd"></span></div>
+<div class="terminal"><div class="termhead"><span>terminal</span><span>Enter runs the command</span></div><pre id="history" class="history"></pre><div class="promptrow"><span class="prompt">$</span><input id="cmd" autocomplete="off" spellcheck="false"><div id="pendingCmd" class="pendingcmd"></div><button id="stepPath">Step Path</button><button id="run">Run</button></div></div>
+<div id="effect" class="inlineeffect">Enter a command. If it contains a path, the command will stay at the prompt while you step through it.</div>
+<div class="termnote">This is a deliberately small teaching shell, not a complete Linux shell.</div><div class="ref"><b>Supported commands</b><div class="chips"><span class="chip">pwd</span><span class="chip">ls [path]</span><span class="chip">cd path</span><span class="chip">mkdir path</span><span class="chip">touch path</span><span class="chip">cp src dest</span><span class="chip">mv src dest</span><span class="chip">cat path</span><span class="chip">./test</span></div></div>
+</div></section>
+<section class="panel treepanel"><h2 class="title">Filesystem <span class="small">blue outline = current working directory</span></h2><div class="body"><div class="treehelp">Display only. The <strong>blue outline</strong> marks the current working directory. While you step through a pathname, the tree highlights the current <strong>path position</strong> using the same color as that component in the command.</div><div id="tree" class="tree"></div></div></section>
+
+</div></div>
+<script>
+const $=id=>document.getElementById(id), COLORS=['c1','c2','c3','c4','c5','c6'], TCOLORS=['tc1','tc2','tc3','tc4','tc5','tc6'], sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const D=(children={})=>({type:'dir',children}), F=(content='')=>({type:'file',content}), X=()=>({type:'exe'});
+function baseFS(){return D({home:D({student:D({projects:D({hw1:D({code:D({'main.cpp':F('#include <iostream>\nint main(){return 0;}'),test:X()}),data:D({'input.txt':F('4 8 15 16 23 42\n')})}),demo:D({'README.txt':F('Demo notes\n')})}),notes:D({'terminal.txt':F('.. means parent directory\n')})})})})}
+const missions=[
+{name:'Mission 1: Reach the code',start:'/home/student',desc:'Move into the <code>code</code> directory using a <strong>relative path</strong>.',checks:[['Reach the code directory: /home/student/projects/hw1/code',s=>s.cwd==='/home/student/projects/hw1/code']]},
+{name:'Mission 2: Go up, then sideways',start:'/home/student/projects/hw1/code',desc:'Move to the sibling <code>data</code> directory using <code>..</code>.',checks:[['Reach the data directory: /home/student/projects/hw1/data',s=>s.cwd==='/home/student/projects/hw1/data'],['Used .. in a successful cd command',s=>s.flags.dotdot]]},
+{name:'Mission 3: Create something elsewhere',start:'/home/student/projects/hw1/code',desc:'Without leaving <code>code</code>, create <code>../output</code>, then create <code>results.txt</code> inside it.',checks:[['Remain in the code directory',s=>s.cwd==='/home/student/projects/hw1/code'],['../output exists',()=>exists('/home/student/projects/hw1/output','dir')],['../output/results.txt exists',()=>exists('/home/student/projects/hw1/output/results.txt','file')]]},
+{name:'Mission 4: Bring in the input',start:'/home/student/projects/hw1/code',desc:'Copy <code>input.txt</code> from the sibling <code>data</code> directory into the <code>code</code> directory without changing directories.',checks:[['Remain in the code directory',s=>s.cwd==='/home/student/projects/hw1/code'],['code/input.txt exists',()=>exists('/home/student/projects/hw1/code/input.txt','file')]]},
+{name:'Mission 5: Run a local program',start:'/home/student/projects/hw1/code',setup:()=>copyNode('/home/student/projects/hw1/data/input.txt','/home/student/projects/hw1/code/input.txt'),desc:'Run the executable named <code>test</code> from the <code>code</code> directory. If <code>test</code> alone fails, use the path syntax that explicitly names the file in the current working directory.',checks:[['Ran ./test successfully',s=>s.flags.ran],['test created results.txt',()=>exists('/home/student/projects/hw1/code/results.txt','file')]]},
+{name:'Mission 6: Complete the workflow',start:'/home/student/projects/hw1',setup:()=>ensureDir('/home/student/projects/hw1/output'),desc:'Enter the <code>code</code> directory, copy <code>../data/input.txt</code> into <code>code</code>, run <code>./test</code>, then move <code>results.txt</code> to <code>../output</code>.',checks:[['Entered code',s=>s.flags.entered],['Copied input.txt',s=>s.flags.copied],['Ran ./test',s=>s.flags.ran],['Moved results.txt to output',()=>exists('/home/student/projects/hw1/output/results.txt','file')]]}
+];
+let S,lastTrace=null,busy=false;
+function norm(path){if(path==='')return S.cwd;let raw=path;if(raw==='~')raw='/home/student';else if(raw.startsWith('~/'))raw='/home/student/'+raw.slice(2);let stack=raw.startsWith('/')?[]:S.cwd.split('/').filter(Boolean);for(const p of raw.split('/')){if(!p||p==='.')continue;if(p==='..'){if(stack.length)stack.pop()}else stack.push(p)}return '/'+stack.join('/')}
+function parent(path){let a=norm(path).split('/').filter(Boolean);a.pop();return '/'+a.join('/')}function base(path){let a=norm(path).split('/').filter(Boolean);return a[a.length-1]||'/'}
+function node(path){let a=norm(path);if(a==='/')return S.fs;let n=S.fs;for(const p of a.split('/').filter(Boolean)){if(!n||n.type!=='dir'||!n.children[p])return null;n=n.children[p]}return n}function exists(path,type){let n=node(path);return !!n&&(!type||n.type===type)}
+function ensureDir(path){let n=S.fs;for(const p of norm(path).split('/').filter(Boolean)){if(!n.children[p])n.children[p]=D();n=n.children[p];if(n.type!=='dir')throw Error(p+' is not a directory')}return n}
+function put(path,n){let p=node(parent(path));if(!p||p.type!=='dir')throw Error('No such directory: '+parent(path));p.children[base(path)]=n}function remove(path){let p=node(parent(path)),b=base(path);if(!p||!p.children[b])return null;let n=p.children[b];delete p.children[b];return n}function clone(n){if(n.type==='dir'){let c={};Object.entries(n.children).forEach(([k,v])=>c[k]=clone(v));return D(c)}return n.type==='file'?F(n.content):X()}
+function copyNode(src,dst){let s=node(src);if(!s)return false;let d=norm(dst),dn=node(d);if(dn&&dn.type==='dir')d=(d==='/'?'':d)+'/'+base(src);put(d,clone(s));return true}
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}function attr(s){return esc(s).replace(/"/g,'&quot;')}
+function entry(name,n,path){let icon=n.type==='dir'?'📁':n.type==='exe'?'⚙️':'📄',cls=n.type==='dir'?'dir':n.type==='exe'?'exe':'file',cur=path===S.cwd?' current':'';return `<span class="entry ${cls}${cur}" data-path="${attr(path)}"><span class="icon">${icon}</span><span>${esc(name)}</span>${n.type==='exe'?'<span class="meta">executable</span>':''}</span>`}
+function treeHTML(n,path='/'){let names=Object.keys(n.children).sort((a,b)=>{let A=n.children[a],B=n.children[b];if(A.type==='dir'&&B.type!=='dir')return-1;if(A.type!=='dir'&&B.type==='dir')return 1;return a.localeCompare(b)}),h='<ul>';if(path==='/')h+=entry('/',n,'/');for(const name of names){let ch=n.children[name],p=path==='/'?'/'+name:path+'/'+name;h+=`<li>${entry(name,ch,p)}${ch.type==='dir'?treeHTML(ch,p):''}</li>`}return h+'</ul>'}
+function render(){ $('tree').innerHTML=treeHTML(S.fs);$('cwd').textContent=S.cwd;$('history').textContent=S.history;$('history').scrollTop=$('history').scrollHeight;let m=missions[S.mission];$('mname').textContent=m.name;$('progress').textContent=`${S.mission+1} / ${missions.length}`;$('mdesc').innerHTML=m.desc;$('checks').innerHTML=m.checks.map(([t,f])=>{let d=!!f(S);return `<div class="check ${d?'done':''}"><span class="box">${d?'✓':''}</span><span>${t}</span></div>`}).join('');let done=m.checks.every(([,f])=>f(S));$('success').classList.toggle('show',done);$('successText').textContent=done?m.name.replace(/^Mission \d+:\s*/,'')+' complete.':'';$('next').style.display=S.mission===missions.length-1?'none':'inline-block'}
+function resetMission(i=S?.mission??0){S={fs:baseFS(),cwd:missions[i].start,mission:i,history:'',flags:{dotdot:false,ran:false,entered:false,copied:false}};if(missions[i].setup)missions[i].setup();lastTrace=null;clearPendingCommand();$('effect').innerHTML='Enter a command. If it contains a path, the command will stay at the prompt while you step through it.';$('cmd').value='';render();$('cmd').focus()}
+function tokens(s){let a=[],c='',q=null;for(const ch of s){if(q){if(ch===q)q=null;else c+=ch}else if(ch==='"'||ch==="'")q=ch;else if(/\s/.test(ch)){if(c){a.push(c);c=''}}else c+=ch}if(c)a.push(c);return a}
+function pathInfo(raw){let comps,start,abs=false;if(raw==='~'){start='/';comps=['home','student'];abs=true}else if(raw.startsWith('~/')){start='/';comps=['home','student',...raw.slice(2).split('/').filter(Boolean)];abs=true}else{abs=raw.startsWith('/');start=abs?'/':S.cwd;comps=raw.split('/').filter(x=>x!=='')}return{raw,start,comps,abs}}
+function trace(raw,allowMissingFinal=false,label='path'){let i=pathInfo(raw),cur=i.start,steps=[];if(i.abs){steps.push({part:raw.startsWith('~')?'~':'/',to:raw.startsWith('~')?'/home/student':'/',anchor:true,ok:true});cur=raw.startsWith('~')?'/home/student':'/'}for(let k=0;k<i.comps.length;k++){let part=i.comps[k],next=part==='.'?cur:part==='..'?parent(cur):(cur==='/'?'/'+part:cur+'/'+part),final=k===i.comps.length-1,found=!!node(next),ok=found||(allowMissingFinal&&final);steps.push({part,to:next,found,newFinal:!found&&allowMissingFinal&&final,error:!ok});cur=next;if(!ok)break}return{label,raw,steps,failed:steps.some(s=>s.error),final:cur}}
+function pathTraces(cmd,args){if(cmd==='cd')return args[0]?[trace(args[0],false,'directory')]:[];if(cmd==='ls'&&args[0])return[trace(args[0],false,'list path')];if(cmd==='mkdir'||cmd==='touch')return args[0]?[trace(args[0],true,cmd==='mkdir'?'new directory':'file path')]:[];if(cmd==='cat')return args[0]?[trace(args[0],false,'file')]:[];if(cmd==='cp'||cmd==='mv')return args.length>=2?[trace(args[0],false,'source'),trace(args[1],true,'destination')]:[];if(cmd==='./test')return[trace('./test',false,'program path')];return[]}
+function clearTrace(){
+  document.querySelectorAll('.entry.trace,.entry.target').forEach(e=>e.classList.remove('trace','target',...TCOLORS))
+}
+
+function pathTokenMarkup(raw,t,offset){
+  let html='',si=0;
+
+  if(raw.startsWith('/')){
+    const ci=(offset+si)%COLORS.length;
+    html+=`<span class="cmdseg ${COLORS[ci]}" data-step="${offset+si}">/</span>`;
+    si++;
+  }
+
+  const parts=raw.split('/').filter(Boolean);
+  parts.forEach((part,pi)=>{
+    if(pi>0 || (raw.startsWith('/') && html)) html+='<span class="cmdslash">/</span>';
+
+    // A trace can contain synthetic anchor steps. Use the next available step.
+    if(si<t.steps.length){
+      const ci=(offset+si)%COLORS.length;
+      html+=`<span class="cmdseg ${COLORS[ci]}" data-step="${offset+si}">${esc(part)}</span>`;
+      si++;
+    }else{
+      html+=`<span class="cmdplain">${esc(part)}</span>`;
+    }
+  });
+
+  if(raw==='.' || raw==='..'){
+    // split('/').filter(Boolean) already handled these normally.
+  }
+
+  return html;
+}
+
+function commandMarkup(command,T){
+  const a=tokens(command),cmd=a[0],args=a.slice(1);
+  let html=`<span class="cmdplain">${esc(cmd)}</span>`;
+  let mappings=[];
+
+  if(cmd==='cd'||cmd==='mkdir'||cmd==='touch'||cmd==='cat'){
+    if(args[0]&&T[0])mappings.push({arg:0,trace:0});
+  }else if(cmd==='ls'){
+    if(args[0]&&T[0])mappings.push({arg:0,trace:0});
+  }else if(cmd==='cp'||cmd==='mv'){
+    if(args[0]&&T[0])mappings.push({arg:0,trace:0});
+    if(args[1]&&T[1])mappings.push({arg:1,trace:1});
+  }else if(cmd==='./test'&&T[0]){
+    // The command itself is a pathname.
+    html=pathTokenMarkup(cmd,T[0],0);
+  }
+
+  if(cmd!=='./test'){
+    for(let ai=0;ai<args.length;ai++){
+      html+=' ';
+      const m=mappings.find(x=>x.arg===ai);
+      if(m){
+        const offset=T.slice(0,m.trace).reduce((n,t)=>n+t.steps.length,0);
+        html+=pathTokenMarkup(args[ai],T[m.trace],offset);
+      }else{
+        html+=`<span class="cmdplain">${esc(args[ai])}</span>`;
+      }
+    }
+  }
+
+  return html;
+}
+
+function showPendingCommand(command,T){
+  $('cmd').style.display='none';
+  $('run').style.display='none';
+  $('pendingCmd').innerHTML=commandMarkup(command,T);
+  $('pendingCmd').classList.add('show');
+  $('stepPath').classList.add('show');
+}
+
+function clearPendingCommand(){
+  if(!$('pendingCmd'))return;
+  $('pendingCmd').classList.remove('show');
+  $('pendingCmd').innerHTML='';
+  $('stepPath').classList.remove('show');
+  $('stepPath').disabled=false;
+  $('stepPath').textContent='Step Path';
+  $('cmd').style.display='';
+  $('run').style.display='';
+}
+
+function waitForStep(label){
+  return new Promise(resolve=>{
+    $('stepPath').textContent=label;
+    $('stepPath').disabled=false;
+    $('stepPath').onclick=()=>{
+      $('stepPath').disabled=true;
+      resolve();
+    };
+  });
+}
+
+async function animate(T,summary,bad=false){
+  lastTrace={T,summary,bad};
+  clearTrace();
+
+  const command=$('cmd').value.trim();
+  const flat=[];
+  T.forEach((t,ti)=>t.steps.forEach((s,si)=>flat.push({t,ti,s,si})));
+
+  showPendingCommand(command,T);
+
+  if(!flat.length){
+    $('effect').innerHTML=summary;
+    clearPendingCommand();
+    return;
+  }
+
+  $('effect').innerHTML=`<strong>Path ready.</strong> Click <b>Step Path</b> to interpret <code>${esc(flat[0].s.part)}</code>.`;
+
+  for(let i=0;i<flat.length;i++){
+    const {s}=flat[i];
+    const ci=i%COLORS.length;
+
+    await waitForStep(`Step Path (${i+1} of ${flat.length})`);
+
+    document.querySelectorAll('.cmdseg').forEach(el=>el.classList.remove('active'));
+    const seg=document.querySelector(`.cmdseg[data-step="${i}"]`);
+    if(seg){
+      seg.classList.add('done','active');
+      if(s.error)seg.classList.add('error');
+    }
+
+    clearTrace();
+    const en=document.querySelector(`.entry[data-path="${CSS.escape(s.to)}"]`);
+    if(en){
+      en.classList.add('trace',TCOLORS[ci]);
+      if(i===flat.length-1||s.error)en.classList.add('target');
+    }
+
+    const meaning=
+      s.part==='.' ? `The path position stays at <code>${esc(s.to)}</code>.` :
+      s.part==='..' ? `Move up to the parent: <code>${esc(s.to)}</code>.` :
+      s.part==='~' ? `Start from home: <code>${esc(s.to)}</code>.` :
+      s.part==='/' ? `Start at the filesystem root <code>/</code>.` :
+      s.newFinal ? `<code>${esc(s.part)}</code> will be a new name at <code>${esc(s.to)}</code>.` :
+      s.error ? `<code>${esc(s.part)}</code> was not found at <code>${esc(s.to)}</code>.` :
+      `Resolve <code>${esc(s.part)}</code> → <code>${esc(s.to)}</code>.`;
+
+    if(s.error||i===flat.length-1){
+      $('effect').innerHTML=meaning+' <strong>Path resolution is complete.</strong>';
+    }else{
+      $('effect').innerHTML=meaning+` The current working directory has not changed. Next: <code>${esc(flat[i+1].s.part)}</code>.`;
+    }
+
+    if(s.error)break;
+  }
+
+  // Let the final highlighted tree location remain visible briefly before the
+  // command takes effect and the tree is redrawn.
+  await sleep(350);
+  $('effect').innerHTML=summary;
+  clearPendingCommand();
+}
+
+async function replay(){}
+function toggle(on){$('cmd').disabled=!on;$('run').disabled=!on}
+function append(command,output=''){S.history+=`${S.cwd} $ ${command}\n`;if(output)S.history+=output.replace(/\n?$/,'\n')}
+function list(path){let n=node(path);if(!n)throw Error(`ls: cannot access '${path}': No such file or directory`);if(n.type!=='dir')return base(path);return Object.keys(n.children).sort((a,b)=>{let A=n.children[a],B=n.children[b];if(A.type==='dir'&&B.type!=='dir')return-1;if(A.type!=='dir'&&B.type==='dir')return 1;return a.localeCompare(b)}).join('  ')}
+async function run(){if(busy)return;let text=$('cmd').value.trim();if(!text)return;let a=tokens(text),cmd=a[0],args=a.slice(1);busy=true;toggle(false);let T=pathTraces(cmd,args),output='',effect='',summary='',bad=false,op=null;try{let fail=T.find(t=>t.failed);if(fail){let s=fail.steps.find(x=>x.error);throw Error('No such file or directory: '+(s?.to||fail.raw))}if(cmd==='pwd'){output=S.cwd;effect='<code>pwd</code> printed the current working directory.';summary='<strong>No pathname to resolve.</strong> <code>pwd</code> reports the current working directory.'}
+else if(cmd==='ls'){let target=args[0]?norm(args[0]):S.cwd;output=list(target);effect=`Listed <code>${esc(target)}</code>.`;summary=args[0]?`The pathname resolves to <code>${esc(target)}</code>; <code>ls</code> lists that location.`:'<strong>No pathname supplied.</strong> <code>ls</code> lists the current working directory.'}
+else if(cmd==='cd'){if(args.length!==1)throw Error('usage: cd path');let target=norm(args[0]),n=node(target);if(!n||n.type!=='dir')throw Error(`cd: ${args[0]}: No such directory`);op=()=>{S.cwd=target;if(args[0].includes('..'))S.flags.dotdot=true;if(target==='/home/student/projects/hw1/code')S.flags.entered=true};effect=`Changed the current working directory to <code>${esc(target)}</code>.`;summary=`The path resolves to <code>${esc(target)}</code>. Then <code>cd</code> makes it the current working directory.`}
+else if(cmd==='mkdir'){if(args.length!==1)throw Error('usage: mkdir path');let target=norm(args[0]);if(node(target))throw Error(`mkdir: '${args[0]}': File exists`);if(!node(parent(target)))throw Error(`mkdir: '${args[0]}': No such directory`);op=()=>put(target,D());effect=`Created directory <code>${esc(target)}</code>.`;summary=`The existing path resolves to the parent; <code>${esc(base(target))}</code> is the new directory name.`}
+else if(cmd==='touch'){if(args.length!==1)throw Error('usage: touch path');let target=norm(args[0]),ex=node(target);if(ex&&ex.type==='dir')throw Error(`touch: '${args[0]}': Is a directory`);if(!node(parent(target)))throw Error(`touch: '${args[0]}': No such directory`);op=()=>{if(!ex)put(target,F())};effect=ex?`Updated the modification time of <code>${esc(target)}</code>.`:`Created empty file <code>${esc(target)}</code>.`;summary=`The path identifies <code>${esc(target)}</code>. If it does not exist, <code>touch</code> creates it.`}
+else if(cmd==='cat'){if(args.length!==1)throw Error('usage: cat path');let target=norm(args[0]),n=node(target);if(!n||n.type!=='file')throw Error(`cat: ${args[0]}: Not a readable file`);output=n.content;effect=`Read <code>${esc(target)}</code>.`;summary=`The pathname resolves to <code>${esc(target)}</code>; <code>cat</code> prints its contents.`}
+else if(cmd==='cp'||cmd==='mv'){if(args.length!==2)throw Error(`usage: ${cmd} source destination`);let src=norm(args[0]),sn=node(src);if(!sn)throw Error(`${cmd}: cannot stat '${args[0]}'`);let dest=norm(args[1]),dn=node(dest);if(dn&&dn.type==='dir')dest=(dest==='/'?'':dest)+'/'+base(src);if(!node(parent(dest)))throw Error(`${cmd}: target directory does not exist`);op=()=>{if(cmd==='cp')put(dest,clone(sn));else put(dest,remove(src));if(cmd==='cp'&&base(src)==='input.txt'&&dest==='/home/student/projects/hw1/code/input.txt')S.flags.copied=true};effect=`${cmd==='cp'?'Copied':'Moved'} <code>${esc(src)}</code> → <code>${esc(dest)}</code>.`;summary=`First the source resolves to <code>${esc(src)}</code>. Then the destination starts from the same current working directory; its path position finishes at <code>${esc(dest)}</code>.`}
+else if(cmd==='test'){output='test: command not found';effect='The shell did not treat the current working directory as a command-search location.';summary='<strong>No pathname was given.</strong> <code>test</code> is a command name, not “the test file right here.” Try <code>./test</code>.';bad=true}
+else if(cmd==='./test'){let target=norm('./test'),n=node(target);if(!n||n.type!=='exe')throw Error('./test: No such executable');if(!node(S.cwd+'/input.txt')){output='test: input.txt not found';effect='The program ran, but expected <code>input.txt</code> in the current working directory.';summary=`<code>.</code> means the current working directory. The path position starts there, then <code>test</code> resolves to <code>${esc(target)}</code>.`;bad=true}else{op=()=>{put(S.cwd+'/results.txt',F('sum = 108\n'));S.flags.ran=true};output='Read input.txt\nWrote results.txt';effect='Executed <code>./test</code>; it created <code>results.txt</code>.';summary=`<code>.</code> names the current working directory, <code>${esc(S.cwd)}</code>. The path position starts there; the next component selects <code>test</code>.`}}
+else{output=`${cmd}: command not found`;effect=`The teaching shell does not support <code>${esc(cmd)}</code>.`;summary='<strong>Unsupported command.</strong> Try one of the commands listed below the terminal.';bad=true}
+if(T.length)await animate(T,summary,bad);else{$('resolve').className='';$('resolve').innerHTML=`<div class="summary${bad?' bad':''}">${summary}</div>`;lastTrace=null}append(text,output);if(op)op();$('effect').innerHTML=effect}
+catch(e){append(text,e.message);$('effect').innerHTML=`Command failed: <code>${esc(e.message)}</code>.`;if(T.length)await animate(T,`<strong>Resolution stopped.</strong> ${esc(e.message)}`,true);else{$('resolve').className='';$('resolve').innerHTML=`<div class="summary bad"><strong>Command failed.</strong> ${esc(e.message)}</div>`}}render();$('cmd').value='';toggle(true);busy=false;$('cmd').focus()}
+const sel=$('missionSelect');missions.forEach((m,i)=>sel.add(new Option(m.name,i)));sel.onchange=()=>resetMission(+sel.value);$('reset').onclick=()=>resetMission(S.mission);$('next').onclick=()=>{if(S.mission<missions.length-1){sel.value=String(S.mission+1);resetMission(S.mission+1)}};$('run').onclick=run;$('cmd').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();run()}});sel.value='0';resetMission(0);
+</script>
+</body>
+</html>
