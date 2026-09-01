@@ -105,6 +105,8 @@
     color:white;
   }
 
+  #stepBtn{width:82px;white-space:nowrap}
+
   button.secondary{background:#475467}
   button.light{background:#e7eaf1;color:#26324a}
   button:disabled{opacity:.45;cursor:default}
@@ -460,14 +462,6 @@
           <div><strong id="stepLabel">Executed:</strong> <code id="currentLine">—</code></div>
           <div id="explanation" class="explanation">Press <strong>Step</strong> to execute the first line.</div>
         </div>
-
-        <div class="assumptions">
-          Fake addresses are intentionally simple. Stack begins at <code>0x1000</code>;
-          heap begins at <code>0x4000</code>. Raw integers are displayed in decimal.
-          Values that are known addresses are displayed in hexadecimal. An uninitialized pointer slot is shown as <code>0x????</code>: unknown raw bits, not a defined C++ address value. The address-of operator <code>&amp;</code> is supported,
-          but C++ reference types and pointer-to-pointer types are intentionally not modeled. The explorer also recognizes one two-field <code>Point</code> struct and one-parameter <code>void</code> functions for comparing values, pointers, and C-style arrays. The heap uses a simple first-fit allocator.
-          A nested <code>{ ... }</code> block creates a local scope whose stack variables disappear at its closing brace.
-        </div>
       </div>
     </section>
 
@@ -475,6 +469,14 @@
       <h2 class="panel-title">Variables</h2>
       <div id="varsTable"></div>
     </section>
+
+    <div class="assumptions">
+      Fake addresses are intentionally simple. Stack begins at <code>0x1000</code>;
+      heap begins at <code>0x4000</code>. Raw integers are displayed in decimal.
+      Values that are known addresses are displayed in hexadecimal. An uninitialized pointer slot is shown as <code>0x????</code>: unknown raw bits, not a defined C++ address value. The address-of operator <code>&amp;</code> is supported,
+      but pointer-to-pointer types are intentionally not modeled. The explorer models <code>int&amp;</code> as an alias and supports one two-field <code>Point</code> struct plus one-parameter <code>void</code> functions for comparing values, references, pointers, and C-style arrays. The heap uses a simple first-fit allocator.
+      A nested <code>{ ... }</code> block creates a local scope whose stack variables disappear at its closing brace.
+    </div>
   </div>
 
   <section class="panel stack">
@@ -511,6 +513,10 @@ int level = 3;`,
   "Stack value and heap value": `int score = 10;
 int* heapScore = new int(20);`,
 
+  "Local reference alias": `int score = 10;
+int& scoreAlias = score;
+scoreAlias = 25;`,
+
   "Nested block scope": `int score = 10;
 {
   int temporaryBonus = 5;
@@ -526,6 +532,15 @@ Point stackPoint{10, 20};
 Point* heapPoint = new Point{30, 40};`,
 
   "Pass int by value": `void setTo99(int value) {
+  value = 99;
+}
+
+int score = 10;
+setTo99(score);`,
+
+  "Pass int by reference": `// Teaching view: value is an alias for score, not a second int.
+// A compiler may use pointer-like machinery internally.
+void setTo99(int& value) {
   value = 99;
 }
 
@@ -617,7 +632,7 @@ const presetGroups = [
   },
   {
     label:"Single values and pointers",
-    names:["Nested block scope", "Pointer to stack variable", "Address-of operator"]
+    names:["Local reference alias", "Nested block scope", "Pointer to stack variable", "Address-of operator"]
   },
   {
     label:"Arrays",
@@ -633,7 +648,7 @@ const presetGroups = [
   },
   {
     label:"Function parameters",
-    names:["Pass int by value", "Pass int pointer", "Pass C-style array"]
+    names:["Pass int by value", "Pass int by reference", "Pass int pointer", "Pass C-style array"]
   },
   {
     label:"Undefined behavior",
@@ -726,14 +741,14 @@ function cleanLines(){
 
   for(let i=0;i<sourceLines.length;i++){
     const entry = sourceLines[i];
-    const header = entry.text.match(/^void\s+(\w+)\s*\(\s*int\s*(\*)?\s*(\w+)\s*(\[\s*\])?\s*\)\s*\{$/);
+    const header = entry.text.match(/^void\s+(\w+)\s*\(\s*int\s*(\*|&)?\s*(\w+)\s*(\[\s*\])?\s*\)\s*\{$/);
 
     if(!header){
       if(entry.text) runtime.push(entry);
       continue;
     }
 
-    const [,name,pointerMark,paramName,arrayMark] = header;
+    const [,name,parameterMark,paramName,arrayMark] = header;
     const body = [];
     let closed = false;
 
@@ -753,7 +768,7 @@ function cleanLines(){
     functionDefinitions.set(name,{
       name,
       parameterName:paramName,
-      parameterMode:arrayMark ? "array" : pointerMark ? "pointer" : "value",
+      parameterMode:arrayMark ? "array" : parameterMark === "&" ? "reference" : parameterMark === "*" ? "pointer" : "value",
       body
     });
   }
@@ -1025,7 +1040,7 @@ function evalInt(expr){
   if(/^\w+$/.test(expr)){
     const v = variable(expr);
 
-    if(v.kind !== "int"){
+    if(v.kind !== "int" && v.kind !== "ref"){
       throw new Error(`${expr} is not an int.`);
     }
 
@@ -1141,19 +1156,28 @@ function callFunction(definition,argumentText,callLineNo){
   if(definition.parameterMode === "value"){
     argument = evalInt(argumentText);
   }
+  else if(definition.parameterMode === "reference"){
+    const source = variable(argumentText.trim());
+
+    if(source.kind !== "int" && source.kind !== "ref"){
+      throw new Error("This reference parameter needs an int variable in this simulator.");
+    }
+
+    argument = source.addr;
+  }
   else{
     argument = evalPointer(argumentText);
   }
 
   const stackStart = state.nextStack;
-  const type = definition.parameterMode === "value" ? "int" : "int*";
-  const label = definition.parameterName + " (param)";
-  const addr = allocStack(label,type,argument);
+  const isReference = definition.parameterMode === "reference";
+  const type = definition.parameterMode === "value" ? "int" : isReference ? "int&" : "int*";
+  const addr = isReference ? argument : allocStack(definition.parameterName + " (param)",type,argument);
   const previousVariable = state.vars.get(definition.parameterName);
 
   state.vars.set(definition.parameterName,{
     name:definition.parameterName,
-    kind:definition.parameterMode === "value" ? "int" : "ptr",
+    kind:definition.parameterMode === "value" ? "int" : isReference ? "ref" : "ptr",
     addr,
     type:type + " (parameter)"
   });
@@ -1161,7 +1185,8 @@ function callFunction(definition,argumentText,callLineNo){
   state.frames.push({
     name:definition.name,
     parameterName:definition.parameterName,
-    parameterAddr:addr,
+    parameterAddr:isReference ? null : addr,
+    isReference,
     previousVariable,
     stackStart
   });
@@ -1183,6 +1208,10 @@ function callFunction(definition,argumentText,callLineNo){
     return "Calling " + definition.name + " copies " + argument + " into the temporary stack parameter " + definition.parameterName + ".";
   }
 
+  if(isReference){
+    return "Calling " + definition.name + " binds " + definition.parameterName + " as an alias for the caller's int at " + hex(argument) + ". This teaching view adds no separate parameter stack slot; a compiler may use pointer-like machinery internally.";
+  }
+
   const addressText = argument === null ? "nullptr" : hex(argument);
   if(definition.parameterMode === "array"){
     return "Calling " + definition.name + " passes the address of the first array element (" + addressText + ") into the temporary pointer parameter.";
@@ -1197,8 +1226,10 @@ function returnFromFunction(name){
     throw new Error("Function return did not match an active call.");
   }
 
-  state.stack.delete(frame.parameterAddr);
-  state.nextStack = frame.stackStart;
+  if(frame.parameterAddr !== null){
+    state.stack.delete(frame.parameterAddr);
+    state.nextStack = frame.stackStart;
+  }
 
   if(frame.previousVariable){
     state.vars.set(frame.parameterName,frame.previousVariable);
@@ -1207,7 +1238,9 @@ function returnFromFunction(name){
     state.vars.delete(frame.parameterName);
   }
 
-  return "Returned from " + name + ". Its temporary parameter slot has been removed from the stack.";
+  return frame.isReference
+    ? "Returned from " + name + ". Its temporary reference alias is no longer in scope; the caller's int remains on the stack."
+    : "Returned from " + name + ". Its temporary parameter slot has been removed from the stack.";
 }
 
 function displayEntry(entry){
@@ -1419,6 +1452,32 @@ function execute(line){
   }
 
   // int score = expression;
+  m = line.match(/^int\s*&\s*(\w+)\s*=\s*(\w+)\s*;$/);
+
+  if(m){
+    const name = m[1];
+    const sourceName = m[2];
+
+    if(state.vars.has(name)){
+      throw new Error(`${name} is already declared.`);
+    }
+
+    const source = variable(sourceName);
+    if(source.kind !== "int" && source.kind !== "ref"){
+      throw new Error(`${sourceName} is not an int variable that can be referenced here.`);
+    }
+
+    declareVariable(name,{
+      name,
+      kind:"ref",
+      addr:source.addr,
+      type:"int&"
+    });
+
+    return `${name} is a reference alias for ${sourceName}. Both names use the same stack address ${hex(source.addr)}; this model adds no second stack slot.`;
+  }
+
+  // int score = expression;
   m = line.match(/^int\s+(\w+)\s*(?:=\s*(.+?))?\s*;$/);
 
   if(m){
@@ -1550,13 +1609,15 @@ function execute(line){
       return `Changed the address stored in pointer ${name} to ${value===null ? "nullptr" : hex(value)}.${leakNote}`;
     }
 
-    if(v.kind === "int"){
+    if(v.kind === "int" || v.kind === "ref"){
       const value = evalInt(m[2]);
 
       state.stack.get(v.addr).value = value;
       state.touchedStack.add(v.addr);
 
-      return `Stored ${value} in ${name} at ${hex(v.addr)}.`;
+      return v.kind === "ref"
+        ? `Stored ${value} through reference ${name} at ${hex(v.addr)}. Its aliased int now has that value too.`
+        : `Stored ${value} in ${name} at ${hex(v.addr)}.`;
     }
   }
 
@@ -1743,12 +1804,9 @@ function renderHeap(){
 }
 
 function renderVars(){
-  if(state.vars.size === 0){
-    varsTableEl.innerHTML = `<div class="empty-vars">No variables declared yet.</div>`;
-    return;
-  }
-
-  const rows = [...state.vars.values()].map(v => `
+  const rows = state.vars.size === 0
+    ? `<tr><td class="empty-vars" colspan="3">No variables declared yet.</td></tr>`
+    : [...state.vars.values()].map(v => `
     <tr>
       <td><strong>${v.name}</strong></td>
       <td>${v.type}</td>
@@ -1827,6 +1885,9 @@ function predictionPrompt(line){
     if(definition.parameterMode === "value"){
       return "Predict: what new temporary stack slot will hold the copied int value? Will changing that slot affect the caller?";
     }
+    if(definition.parameterMode === "reference"){
+      return "Predict: will the parameter be an alias for the caller's stack address? What does that mean for a change inside the function?";
+    }
     if(definition.parameterMode === "array"){
       return "Predict: what address is passed for the array, and which caller array element will the function change?";
     }
@@ -1847,6 +1908,10 @@ function predictionPrompt(line){
 
   if(/^int\s*\*\s*\w+\s*=\s*new\s+int/.test(s)){
     return "Predict: which memory regions will change — stack, heap, or both? What address will the pointer store?";
+  }
+
+  if(/^int\s*&\s*\w+/.test(s)){
+    return "Predict: will this reference create another stack int, or will it become another name for an existing stack address?";
   }
 
   if(/^delete/.test(s)){
